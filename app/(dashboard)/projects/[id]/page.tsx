@@ -3,7 +3,7 @@ import { use, useState, FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useFlowDeskStore } from "@/lib/store";
-import { Card, Badge, EmptyState } from "@/components/ui/Misc";
+import { Card, Badge, EmptyState, Skeleton, ErrorState } from "@/components/ui/Misc";
 import { Button } from "@/components/ui/Button";
 import { Input, Select, Textarea } from "@/components/ui/Field";
 import { Modal } from "@/components/ui/Modal";
@@ -21,6 +21,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const teamMembers = useFlowDeskStore((s) => s.teamMembers);
   const updateProject = useFlowDeskStore((s) => s.updateProject);
   const deleteProject = useFlowDeskStore((s) => s.deleteProject);
+  const dataLoaded = useFlowDeskStore((s) => s.dataLoaded);
+  const dataError = useFlowDeskStore((s) => s.dataError);
+  const initData = useFlowDeskStore((s) => s.initData);
 
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -29,6 +32,19 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const [status, setStatus] = useState<ProjectStatus>(project?.status ?? "Planning");
   const [dueDate, setDueDate] = useState(project?.dueDate ?? "");
   const [error, setError] = useState<string | null>(null);
+
+  if (dataError) {
+    return <ErrorState testId="project-detail-error" onRetry={() => initData()} />;
+  }
+
+  if (!dataLoaded) {
+    return (
+      <div data-testid="project-detail-loading" className="space-y-4">
+        <Skeleton className="h-32 w-full" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
 
   if (!project) {
     return (
@@ -54,7 +70,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     setEditOpen(true);
   }
 
-  function handleSave(e: FormEvent) {
+  async function handleSave(e: FormEvent) {
     e.preventDefault();
     if (name.trim().length < 3) {
       setError("Project name must be at least 3 characters.");
@@ -64,13 +80,13 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       setError("Due date is required.");
       return;
     }
-    updateProject(project!.id, { name: name.trim(), description, status, dueDate });
+    await updateProject(project!.id, { name: name.trim(), description, status, dueDate });
     showToast("Project updated.");
     setEditOpen(false);
   }
 
-  function handleDelete() {
-    deleteProject(project!.id);
+  async function handleDelete() {
+    await deleteProject(project!.id);
     showToast("Project deleted.");
     router.push("/projects");
   }

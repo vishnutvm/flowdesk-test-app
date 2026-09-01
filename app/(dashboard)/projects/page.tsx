@@ -3,7 +3,7 @@ import { useMemo, useState, FormEvent, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useFlowDeskStore } from "@/lib/store";
-import { Card, Badge, EmptyState } from "@/components/ui/Misc";
+import { Card, Badge, EmptyState, Skeleton, ErrorState } from "@/components/ui/Misc";
 import { Button } from "@/components/ui/Button";
 import { Input, Select, Textarea } from "@/components/ui/Field";
 import { Modal } from "@/components/ui/Modal";
@@ -16,6 +16,9 @@ function ProjectsContent() {
   const searchParams = useSearchParams();
   const projects = useFlowDeskStore((s) => s.projects);
   const createProject = useFlowDeskStore((s) => s.createProject);
+  const dataLoaded = useFlowDeskStore((s) => s.dataLoaded);
+  const dataError = useFlowDeskStore((s) => s.dataError);
+  const initData = useFlowDeskStore((s) => s.initData);
   const { showToast } = useToast();
 
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -25,6 +28,7 @@ function ProjectsContent() {
   const [status, setStatus] = useState<ProjectStatus>("Planning");
   const [dueDate, setDueDate] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const filtered = useMemo(
     () => (statusFilter === "all" ? projects : projects.filter((p) => p.status === statusFilter)),
@@ -39,9 +43,11 @@ function ProjectsContent() {
     setError(null);
   }
 
-  function handleCreate(e: FormEvent) {
+  async function handleCreate(e: FormEvent) {
     e.preventDefault();
-    const result = createProject({ name, description, status, dueDate });
+    setSubmitting(true);
+    const result = await createProject({ name, description, status, dueDate });
+    setSubmitting(false);
     if (!result.ok) {
       setError(result.error ?? "Unable to create project.");
       return;
@@ -58,7 +64,7 @@ function ProjectsContent() {
           <h1 className="text-2xl font-semibold text-slate-900">Projects</h1>
           <p className="mt-1 text-sm text-slate-500">Track progress across all of your organization&apos;s projects.</p>
         </div>
-        <Button data-testid="new-project-button" data-ai-target="new-project-button" onClick={() => setModalOpen(true)}>
+        <Button data-testid="new-project-button" data-ai-target="new-project-button" disabled={!dataLoaded} onClick={() => setModalOpen(true)}>
           + New project
         </Button>
       </div>
@@ -84,7 +90,15 @@ function ProjectsContent() {
         </select>
       </div>
 
-      {filtered.length === 0 ? (
+      {dataError ? (
+        <ErrorState testId="projects-error-state" onRetry={() => initData()} />
+      ) : !dataLoaded ? (
+        <div data-testid="projects-loading" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-40 w-full" />
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
         <EmptyState
           testId="projects-empty-state"
           title="No projects yet"
@@ -172,7 +186,7 @@ function ProjectsContent() {
             <Button type="button" variant="outline" onClick={() => setModalOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit" data-testid="create-project-submit" data-ai-target="create-project-submit">
+            <Button type="submit" data-testid="create-project-submit" data-ai-target="create-project-submit" isLoading={submitting}>
               Create project
             </Button>
           </div>

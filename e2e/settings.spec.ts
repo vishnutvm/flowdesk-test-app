@@ -67,11 +67,15 @@ test("upgrades the subscription plan", async ({ page }) => {
 });
 
 test("generates a new API key and reveals it once", async ({ page }) => {
+  // Unique per run — see the comment in e2e/workflows.spec.ts's "creates a
+  // new project" test for why: reseeding doesn't delete records created by
+  // earlier runs of this test.
+  const keyName = `Playwright Test Key ${Date.now()}`;
   await page.goto("/settings/integrations");
   await page.getByTestId("generate-api-key-button").click();
-  await page.getByTestId("api-key-name-input").fill("Playwright Test Key");
+  await page.getByTestId("api-key-name-input").fill(keyName);
   await page.getByTestId("confirm-generate-api-key").click();
   await expect(page.getByTestId("revealed-api-key")).toBeVisible();
   await page.getByTestId("close-revealed-key").click();
-  await expect(page.getByText("Playwright Test Key")).toBeVisible();
+  await expect(page.getByText(keyName)).toBeVisible();
 });

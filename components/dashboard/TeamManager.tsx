@@ -3,7 +3,7 @@ import { useState, FormEvent, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useFlowDeskStore } from "@/lib/store";
 import { canManageTeam } from "@/lib/permissions";
-import { Card, Badge, PermissionDenied } from "@/components/ui/Misc";
+import { Card, Badge, PermissionDenied, Skeleton, ErrorState } from "@/components/ui/Misc";
 import { Button } from "@/components/ui/Button";
 import { Input, Select } from "@/components/ui/Field";
 import { Modal } from "@/components/ui/Modal";
@@ -20,6 +20,9 @@ function TeamManagerInner({ embedded }: { embedded?: boolean }) {
   const changeMemberRole = useFlowDeskStore((s) => s.changeMemberRole);
   const simulatedRole = useFlowDeskStore((s) => s.simulatedRole);
   const setSimulatedRole = useFlowDeskStore((s) => s.setSimulatedRole);
+  const dataLoaded = useFlowDeskStore((s) => s.dataLoaded);
+  const dataError = useFlowDeskStore((s) => s.dataError);
+  const initData = useFlowDeskStore((s) => s.initData);
   const { showToast } = useToast();
 
   const canManage = canManageTeam(simulatedRole);
@@ -27,10 +30,13 @@ function TeamManagerInner({ embedded }: { embedded?: boolean }) {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<Role>("Member");
   const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  function handleInvite(e: FormEvent) {
+  async function handleInvite(e: FormEvent) {
     e.preventDefault();
-    const result = inviteMember(email, role);
+    setSubmitting(true);
+    const result = await inviteMember(email, role);
+    setSubmitting(false);
     if (!result.ok) {
       setError(result.error ?? "Unable to send invite.");
       return;
@@ -67,7 +73,7 @@ function TeamManagerInner({ embedded }: { embedded?: boolean }) {
               <option key={r} value={r}>{r}</option>
             ))}
           </select>
-          <Button data-testid="invite-member-button" data-ai-target="invite-member-button" disabled={!canManage} onClick={() => setModalOpen(true)}>
+          <Button data-testid="invite-member-button" data-ai-target="invite-member-button" disabled={!canManage || !dataLoaded} onClick={() => setModalOpen(true)}>
             + Invite member
           </Button>
         </div>
@@ -75,6 +81,15 @@ function TeamManagerInner({ embedded }: { embedded?: boolean }) {
 
       {!canManage && <PermissionDenied action="invite or remove team members" />}
 
+      {dataError ? (
+        <ErrorState testId="team-error-state" onRetry={() => initData()} />
+      ) : !dataLoaded ? (
+        <div data-testid="team-loading" className="space-y-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-12 w-full" />
+          ))}
+        </div>
+      ) : (
       <Card className="overflow-x-auto">
         <table className="w-full min-w-[640px] text-left text-sm">
           <thead className="border-b border-slate-200 text-slate-500">
@@ -105,8 +120,7 @@ function TeamManagerInner({ embedded }: { embedded?: boolean }) {
                     value={m.role}
                     disabled={!canManage}
                     onChange={(e) => {
-                      changeMemberRole(m.id, e.target.value as Role);
-                      showToast("Member role updated.");
+                      void changeMemberRole(m.id, e.target.value as Role).then(() => showToast("Member role updated."));
                     }}
                     className="rounded-md border border-slate-300 px-2 py-1 text-xs disabled:bg-slate-50 disabled:text-slate-400"
                   >
@@ -124,8 +138,7 @@ function TeamManagerInner({ embedded }: { embedded?: boolean }) {
                     data-ai-target="remove-member-button"
                     disabled={!canManage}
                     onClick={() => {
-                      removeMember(m.id);
-                      showToast("Team member removed.");
+                      void removeMember(m.id).then(() => showToast("Team member removed."));
                     }}
                     className="text-sm font-medium text-red-600 hover:text-red-500 disabled:cursor-not-allowed disabled:text-slate-300"
                   >
@@ -137,6 +150,7 @@ function TeamManagerInner({ embedded }: { embedded?: boolean }) {
           </tbody>
         </table>
       </Card>
+      )}
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Invite team member" testId="invite-member-modal">
         <form data-testid="invite-member-form" onSubmit={handleInvite} noValidate className="space-y-4">
@@ -155,7 +169,7 @@ function TeamManagerInner({ embedded }: { embedded?: boolean }) {
             <Button type="button" variant="outline" onClick={() => setModalOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit" data-testid="send-invite-submit" data-ai-target="send-invite-submit">
+            <Button type="submit" data-testid="send-invite-submit" data-ai-target="send-invite-submit" isLoading={submitting}>
               Send invite
             </Button>
           </div>

@@ -9,6 +9,9 @@ import { Topbar } from "./Topbar";
 export function RequireAuth({ children }: { children: React.ReactNode }) {
   const hydrated = useHydrated();
   const isAuthenticated = useFlowDeskStore((s) => s.isAuthenticated);
+  const dataLoaded = useFlowDeskStore((s) => s.dataLoaded);
+  const dataLoading = useFlowDeskStore((s) => s.dataLoading);
+  const initData = useFlowDeskStore((s) => s.initData);
   const router = useRouter();
 
   useEffect(() => {
@@ -16,6 +19,17 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
       router.replace("/login?redirected=1");
     }
   }, [hydrated, isAuthenticated, router]);
+
+  // Kick off the initial fetch of business data (projects, tasks, etc.) from
+  // MongoDB once per authenticated session. Individual pages own their own
+  // loading/error UI based on the shared dataLoading/dataError/dataLoaded
+  // flags this populates.
+  useEffect(() => {
+    if (hydrated && isAuthenticated && !dataLoaded && !dataLoading) {
+      void initData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated, isAuthenticated, dataLoaded]);
 
   if (!hydrated || !isAuthenticated) {
     return (

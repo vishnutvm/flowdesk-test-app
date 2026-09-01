@@ -3,7 +3,7 @@ import { use, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useFlowDeskStore } from "@/lib/store";
-import { Card, Badge, EmptyState } from "@/components/ui/Misc";
+import { Card, Badge, EmptyState, Skeleton, ErrorState } from "@/components/ui/Misc";
 import { Button } from "@/components/ui/Button";
 import { Select, Textarea, Input } from "@/components/ui/Field";
 import { Modal } from "@/components/ui/Modal";
@@ -22,12 +22,27 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
   const teamMembers = useFlowDeskStore((s) => s.teamMembers);
   const updateTask = useFlowDeskStore((s) => s.updateTask);
   const deleteTask = useFlowDeskStore((s) => s.deleteTask);
+  const dataLoaded = useFlowDeskStore((s) => s.dataLoaded);
+  const dataError = useFlowDeskStore((s) => s.dataError);
+  const initData = useFlowDeskStore((s) => s.initData);
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [title, setTitle] = useState(task?.title ?? "");
   const [description, setDescription] = useState(task?.description ?? "");
   const [dueDate, setDueDate] = useState(task?.dueDate ?? "");
   const [titleError, setTitleError] = useState<string | null>(null);
+
+  if (dataError) {
+    return <ErrorState testId="task-detail-error" onRetry={() => initData()} />;
+  }
+
+  if (!dataLoaded) {
+    return (
+      <div data-testid="task-detail-loading" className="space-y-4">
+        <Skeleton className="h-48 w-full" />
+      </div>
+    );
+  }
 
   if (!task) {
     return (
@@ -46,18 +61,18 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
 
   const project = projects.find((p) => p.id === task.projectId);
 
-  function saveField<K extends "title" | "description" | "dueDate">(field: K, value: string) {
+  async function saveField<K extends "title" | "description" | "dueDate">(field: K, value: string) {
     if (field === "title" && !value.trim()) {
       setTitleError("Title is required.");
       return;
     }
     setTitleError(null);
-    updateTask(task!.id, { [field]: value } as never);
+    await updateTask(task!.id, { [field]: value } as never);
     showToast("Task updated.");
   }
 
-  function handleDelete() {
-    deleteTask(task!.id);
+  async function handleDelete() {
+    await deleteTask(task!.id);
     showToast("Task deleted.");
     router.push("/tasks");
   }
@@ -107,8 +122,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
             label="Status"
             value={task.status}
             onChange={(e) => {
-              updateTask(task.id, { status: e.target.value as TaskStatus });
-              showToast("Task status updated.");
+              void updateTask(task.id, { status: e.target.value as TaskStatus }).then(() => showToast("Task status updated."));
             }}
           >
             {STATUSES.map((s) => (
@@ -122,8 +136,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
             label="Priority"
             value={task.priority}
             onChange={(e) => {
-              updateTask(task.id, { priority: e.target.value as TaskPriority });
-              showToast("Task priority updated.");
+              void updateTask(task.id, { priority: e.target.value as TaskPriority }).then(() => showToast("Task priority updated."));
             }}
           >
             {PRIORITIES.map((p) => (
@@ -137,8 +150,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
             label="Assignee"
             value={task.assigneeId ?? ""}
             onChange={(e) => {
-              updateTask(task.id, { assigneeId: e.target.value || null });
-              showToast("Task assignee updated.");
+              void updateTask(task.id, { assigneeId: e.target.value || null }).then(() => showToast("Task assignee updated."));
             }}
           >
             <option value="">Unassigned</option>

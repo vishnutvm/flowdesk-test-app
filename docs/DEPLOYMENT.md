@@ -1,14 +1,19 @@
 # Deployment
 
-FlowDesk is a static-friendly Next.js (App Router) application with no real
-backend, no database, and no external API dependencies. It deploys cleanly to
-Vercel with zero special configuration.
+FlowDesk is a Next.js (App Router) application. Auth is fully mocked
+(no real provider), but business data (projects, tasks, team members,
+customers, notifications, invoices, API keys, webhooks, login history,
+active sessions, integrations, notification prefs) is backed by a real
+MongoDB Atlas database via Next.js Route Handlers under `app/api/**`. It
+deploys cleanly to Vercel with one required environment variable.
 
 ## Prerequisites
 
 - A Vercel account (free tier is sufficient).
 - This repository pushed to a Git provider Vercel can access (GitHub, GitLab,
   or Bitbucket).
+- A MongoDB Atlas cluster (or any reachable MongoDB instance) and its
+  connection string. See "Database setup" in the root `README.md`.
 
 ## Deploy to Vercel
 
@@ -21,32 +26,40 @@ Vercel with zero special configuration.
    - **Output directory:** `.next` (default)
    - **Install command:** `npm install` (default)
 4. Configure environment variables (see below), then click **Deploy**.
+   `MONGODB_URI` must be set **before** the first deploy — pages/routes that
+   read business data will error at request time (not at build time) without
+   it.
 5. Once deployed, Vercel gives you a `*.vercel.app` URL. That URL is the
    "test app URL" referenced throughout `docs/CHATBOT-INTEGRATION-TEST-PLAN.md`.
+6. Seed the deployed database once, from your machine, pointed at the same
+   `MONGODB_URI` Vercel uses: `npm run db:seed`.
 
 ## Environment variables
 
-Copy `.env.example` for the full list. Every variable is optional for the app
-to function, since there is no real backend:
+Copy `.env.example` for the full list.
 
 | Variable | Required | Purpose |
 |---|---|---|
+| `MONGODB_URI` | **Yes** | MongoDB Atlas connection string, including the database name (e.g. `/flowdesk`). Required for every page/route that reads or writes business data. Must be set as a **Vercel environment variable** (Project Settings → Environment Variables) for Production (and Preview/Development as needed) — see below. |
 | `NEXT_PUBLIC_CHATBOT_WIDGET_URL` | No | URL of the real chatbot widget's embed script. Leave unset until the chatbot platform is ready to be wired in — see `components/ChatbotPlaceholder.tsx` for the swap-in instructions. |
 
 Set variables in Vercel under **Project Settings → Environment Variables**
-for each environment (Production / Preview / Development) as needed. No
-variable in this project holds a secret — nothing here needs to be marked
-sensitive, though `NEXT_PUBLIC_*` variables are always public in the client
-bundle regardless.
+for each environment (Production / Preview / Development) as needed.
+`MONGODB_URI` is a secret — mark it sensitive in Vercel and never commit it
+(it's gitignored locally via `.env*` in `.gitignore`, with `.env.example`
+explicitly excepted). `NEXT_PUBLIC_*` variables are always public in the
+client bundle regardless — `MONGODB_URI` is intentionally not prefixed with
+`NEXT_PUBLIC_` and is only read server-side (`lib/mongodb.ts`, used from
+`app/api/**` route handlers).
 
 ## What is NOT required
 
-- No database provisioning (Postgres, MongoDB, etc.) — all data is seeded
-  in `lib/seed-data.ts` and mutated only in the browser via `localStorage`.
-- No auth provider configuration — auth is fully mocked in `lib/store.ts`.
-- No API keys or secrets of any kind.
+- No auth provider configuration — auth is fully mocked in `lib/store.ts`
+  and stays client-side/localStorage-only; it does not touch MongoDB.
+- No other API keys or secrets beyond `MONGODB_URI`.
 - No serverless functions beyond what Next.js generates automatically for
-  routing; the app does not call any external API.
+  routing and the `app/api/**` route handlers; the app does not call any
+  other external API.
 
 ## Local production build check
 
@@ -57,20 +70,29 @@ npm run build
 npm run start   # serves the production build on http://localhost:3000
 ```
 
+`npm run build` does not require `MONGODB_URI` to be set — every
+`app/api/**` route handler is dynamic (`export const dynamic =
+"force-dynamic"`) and connects to MongoDB lazily at request time, not at
+build/collect-page-data time.
+
 ## Rollback
 
-Because this app has no persistent server-side state, rollback is a plain
-Vercel deployment rollback (Vercel dashboard → Deployments → pick a previous
-deployment → **Promote to Production**). There is no data migration to
-reverse.
+Vercel deployment rollback is a plain Vercel deployment rollback (Vercel
+dashboard → Deployments → pick a previous deployment → **Promote to
+Production**). Business data lives in MongoDB, independent of the deployed
+code revision, so a code rollback does not itself roll back data — there is
+no automatic data migration/rollback tied to a deployment.
 
 ## Notes for the chatbot integration team
 
-- The app is fully client-rendered behind login; there is no server data to
-  keep in sync with a staging chatbot environment.
-- Every dashboard page requires the mocked session (see demo credentials in
-  the root `README.md`). The chatbot's test harness should log in through
-  the UI (`/login`) before attempting to test any protected route.
-- The session is stored in the browser's `localStorage` under the key
-  `flowdesk-storage`. Clearing site data resets the app back to the seeded
-  demo state.
+- Auth is mocked client-side; the chatbot's test harness should log in
+  through the UI (`/login`) before attempting to test any protected route.
+  The session is stored in the browser's `localStorage` under the key
+  `flowdesk-storage` — clearing site data resets auth back to the logged-out
+  state, but does **not** reset business data (that lives in MongoDB).
+- Business data (projects, tasks, etc.) is shared across all browsers and
+  sessions hitting the same deployment/database — it is not per-browser like
+  auth is. Running the chatbot's test harness repeatedly against the same
+  environment will accumulate any records it creates; re-run `npm run
+  db:seed` to restore the original seed records (it does not delete
+  records created afterward).

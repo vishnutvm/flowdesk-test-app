@@ -1,16 +1,11 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { validatePassword, useFlowDeskStore } from "@/lib/store";
 import { canManageTeam, canManageBilling, canEditContent } from "@/lib/permissions";
-import { seedProjects, seedTasks, seedCustomers } from "@/lib/seed-data";
+import { validateProjectInput, validateTaskInput, validateCustomerInput, validateWebhookUrl, isValidEmail } from "@/lib/validators";
 
-beforeEach(() => {
-  useFlowDeskStore.setState({
-    projects: seedProjects,
-    tasks: seedTasks,
-    customers: seedCustomers,
-  });
-});
-
+// Auth (login/signup/session) stays fully mocked in lib/store.ts and is
+// untouched by the MongoDB migration, so those tests still exercise the
+// store directly and synchronously, exactly as before.
 describe("validatePassword", () => {
   it("rejects passwords shorter than 8 characters", () => {
     expect(validatePassword("Ab1!")).toMatch(/at least 8 characters/i);
@@ -88,71 +83,93 @@ describe("signup form validation", () => {
   });
 });
 
+// Project/task/customer/webhook validation used to live inline in
+// lib/store.ts's create* actions. It now lives in lib/validators.ts and is
+// shared by the app/api/** route handlers (server-side source of truth) and
+// the store's client-side pre-flight check before hitting the network — so
+// it's tested here directly, without a database or a running Next server.
 describe("project creation validation", () => {
   it("rejects a project name shorter than 3 characters", () => {
-    const result = useFlowDeskStore.getState().createProject({ name: "Ab", description: "", status: "Planning", dueDate: "2026-12-01" });
-    expect(result.ok).toBe(false);
-    expect(result.error).toMatch(/at least 3 characters/i);
+    const error = validateProjectInput({ name: "Ab", description: "", status: "Planning", dueDate: "2026-12-01" });
+    expect(error).toMatch(/at least 3 characters/i);
   });
 
   it("rejects a missing due date", () => {
-    const result = useFlowDeskStore.getState().createProject({ name: "Valid Name", description: "", status: "Planning", dueDate: "" });
-    expect(result.ok).toBe(false);
-    expect(result.error).toMatch(/due date/i);
+    const error = validateProjectInput({ name: "Valid Name", description: "", status: "Planning", dueDate: "" });
+    expect(error).toMatch(/due date/i);
   });
 
-  it("creates a valid project and prepends it to the list", () => {
-    const before = useFlowDeskStore.getState().projects.length;
-    const result = useFlowDeskStore.getState().createProject({ name: "New Project", description: "desc", status: "Active", dueDate: "2026-12-01" });
-    expect(result.ok).toBe(true);
-    const after = useFlowDeskStore.getState().projects;
-    expect(after.length).toBe(before + 1);
-    expect(after[0].name).toBe("New Project");
+  it("rejects a missing name", () => {
+    const error = validateProjectInput({ name: "   ", description: "", status: "Planning", dueDate: "2026-12-01" });
+    expect(error).toMatch(/name is required/i);
+  });
+
+  it("accepts a valid project", () => {
+    const error = validateProjectInput({ name: "New Project", description: "desc", status: "Active", dueDate: "2026-12-01" });
+    expect(error).toBeNull();
   });
 });
 
-describe("task status transitions", () => {
+describe("task creation validation", () => {
   it("rejects a task without a title", () => {
-    const result = useFlowDeskStore.getState().createTask({
-      projectId: "proj-1",
-      title: "",
-      description: "",
-      status: "Todo",
-      priority: "Medium",
-      assigneeId: null,
-      dueDate: "2026-12-01",
-    });
-    expect(result.ok).toBe(false);
+    const error = validateTaskInput({ projectId: "proj-1", title: "", dueDate: "2026-12-01" });
+    expect(error).toMatch(/title is required/i);
   });
 
-  it("moves a task from Todo through to Completed", () => {
-    const taskId = "task-4"; // seeded as Todo
-    useFlowDeskStore.getState().updateTask(taskId, { status: "In Progress" });
-    expect(useFlowDeskStore.getState().tasks.find((t) => t.id === taskId)?.status).toBe("In Progress");
-
-    useFlowDeskStore.getState().updateTask(taskId, { status: "Review" });
-    expect(useFlowDeskStore.getState().tasks.find((t) => t.id === taskId)?.status).toBe("Review");
-
-    useFlowDeskStore.getState().updateTask(taskId, { status: "Completed" });
-    expect(useFlowDeskStore.getState().tasks.find((t) => t.id === taskId)?.status).toBe("Completed");
+  it("rejects a task without a project", () => {
+    const error = validateTaskInput({ projectId: "", title: "Valid title", dueDate: "2026-12-01" });
+    expect(error).toMatch(/select a project/i);
   });
 
-  it("allows moving a Completed task back to In Progress", () => {
-    const taskId = "task-1"; // seeded as Completed
-    useFlowDeskStore.getState().updateTask(taskId, { status: "In Progress" });
-    expect(useFlowDeskStore.getState().tasks.find((t) => t.id === taskId)?.status).toBe("In Progress");
+  it("rejects a task without a due date", () => {
+    const error = validateTaskInput({ projectId: "proj-1", title: "Valid title", dueDate: "" });
+    expect(error).toMatch(/due date/i);
+  });
+
+  it("accepts a valid task", () => {
+    const error = validateTaskInput({ projectId: "proj-1", title: "Valid title", dueDate: "2026-12-01" });
+    expect(error).toBeNull();
   });
 });
 
 describe("customer form validation", () => {
   it("rejects an invalid email address", () => {
-    const result = useFlowDeskStore.getState().createCustomer({ name: "Test", company: "Acme", email: "not-valid", status: "Lead" });
-    expect(result.ok).toBe(false);
+    const error = validateCustomerInput({ name: "Test", email: "not-valid" });
+    expect(error).toMatch(/valid email/i);
   });
 
-  it("creates a valid customer", () => {
-    const result = useFlowDeskStore.getState().createCustomer({ name: "Test Customer", company: "Acme", email: "test@acme.com", status: "Lead" });
-    expect(result.ok).toBe(true);
+  it("rejects a missing name", () => {
+    const error = validateCustomerInput({ name: "", email: "test@acme.com" });
+    expect(error).toMatch(/name is required/i);
+  });
+
+  it("accepts a valid customer", () => {
+    const error = validateCustomerInput({ name: "Test Customer", email: "test@acme.com" });
+    expect(error).toBeNull();
+  });
+});
+
+describe("webhook URL validation", () => {
+  it("rejects a non-URL string", () => {
+    expect(validateWebhookUrl("not a url")).toMatch(/valid webhook url/i);
+  });
+
+  it("rejects a non-http(s) protocol", () => {
+    expect(validateWebhookUrl("ftp://example.com/hook")).toMatch(/valid webhook url/i);
+  });
+
+  it("accepts a valid https URL", () => {
+    expect(validateWebhookUrl("https://example.com/webhook")).toBeNull();
+  });
+});
+
+describe("isValidEmail", () => {
+  it("rejects malformed addresses", () => {
+    expect(isValidEmail("not-an-email")).toBe(false);
+  });
+
+  it("accepts well-formed addresses", () => {
+    expect(isValidEmail("person@example.com")).toBe(true);
   });
 });
 

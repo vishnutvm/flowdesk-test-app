@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useFlowDeskStore } from "@/lib/store";
-import { Card, Badge } from "@/components/ui/Misc";
+import { Card, Badge, Skeleton, ErrorState } from "@/components/ui/Misc";
 
 export default function DashboardPage() {
   const currentUser = useFlowDeskStore((s) => s.currentUser);
@@ -10,6 +10,9 @@ export default function DashboardPage() {
   const teamMembers = useFlowDeskStore((s) => s.teamMembers);
   const notifications = useFlowDeskStore((s) => s.notifications);
   const organization = useFlowDeskStore((s) => s.organization);
+  const dataLoaded = useFlowDeskStore((s) => s.dataLoaded);
+  const dataError = useFlowDeskStore((s) => s.dataError);
+  const initData = useFlowDeskStore((s) => s.initData);
 
   const activeProjects = projects.filter((p) => p.status === "Active").length;
   const openTasks = tasks.filter((t) => t.status !== "Completed").length;
@@ -26,6 +29,27 @@ export default function DashboardPage() {
     { label: "Overdue tasks", value: overdueTasks, testId: "stat-overdue-tasks" },
     { label: "Team members", value: activeMembers, testId: "stat-team-members" },
   ];
+
+  if (dataError) {
+    return (
+      <div data-testid="dashboard-page" className="space-y-8">
+        <ErrorState testId="dashboard-error-state" onRetry={() => initData()} />
+      </div>
+    );
+  }
+
+  if (!dataLoaded) {
+    return (
+      <div data-testid="dashboard-page" className="space-y-8">
+        <div data-testid="dashboard-loading" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 w-full" />
+          ))}
+        </div>
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
 
   return (
     <div data-testid="dashboard-page" className="space-y-8">

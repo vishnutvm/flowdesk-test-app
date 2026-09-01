@@ -2,7 +2,7 @@
 import { useMemo, useState } from "react";
 import clsx from "clsx";
 import { useFlowDeskStore } from "@/lib/store";
-import { Card, EmptyState } from "@/components/ui/Misc";
+import { Card, EmptyState, Skeleton, ErrorState } from "@/components/ui/Misc";
 import { Button } from "@/components/ui/Button";
 
 const FILTERS = ["all", "unread", "read"] as const;
@@ -11,6 +11,9 @@ export default function NotificationsPage() {
   const notifications = useFlowDeskStore((s) => s.notifications);
   const markNotificationRead = useFlowDeskStore((s) => s.markNotificationRead);
   const markAllNotificationsRead = useFlowDeskStore((s) => s.markAllNotificationsRead);
+  const dataLoaded = useFlowDeskStore((s) => s.dataLoaded);
+  const dataError = useFlowDeskStore((s) => s.dataError);
+  const initData = useFlowDeskStore((s) => s.initData);
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("all");
 
   const filtered = useMemo(() => {
@@ -53,7 +56,15 @@ export default function NotificationsPage() {
         ))}
       </div>
 
-      {filtered.length === 0 ? (
+      {dataError ? (
+        <ErrorState testId="notifications-error-state" onRetry={() => initData()} />
+      ) : !dataLoaded ? (
+        <div data-testid="notifications-loading" className="space-y-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-16 w-full" />
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
         <EmptyState testId="notifications-empty-state" title="No notifications" description="You're all caught up — nothing to see here." />
       ) : (
         <Card>

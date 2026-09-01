@@ -2,7 +2,7 @@
 import { useState, FormEvent } from "react";
 import { useFlowDeskStore } from "@/lib/store";
 import { SettingsShell } from "@/components/dashboard/SettingsShell";
-import { Card } from "@/components/ui/Misc";
+import { Card, Skeleton, ErrorState } from "@/components/ui/Misc";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Field";
 import { Modal } from "@/components/ui/Modal";
@@ -19,20 +19,29 @@ export default function IntegrationsSettingsPage() {
   const webhooks = useFlowDeskStore((s) => s.webhooks);
   const addWebhook = useFlowDeskStore((s) => s.addWebhook);
   const removeWebhook = useFlowDeskStore((s) => s.removeWebhook);
+  const dataLoaded = useFlowDeskStore((s) => s.dataLoaded);
+  const dataError = useFlowDeskStore((s) => s.dataError);
+  const initData = useFlowDeskStore((s) => s.initData);
   const { showToast } = useToast();
 
   const [keyModalOpen, setKeyModalOpen] = useState(false);
   const [keyName, setKeyName] = useState("");
   const [revealedKey, setRevealedKey] = useState<string | null>(null);
+  const [keyError, setKeyError] = useState<string | null>(null);
 
   const [webhookModalOpen, setWebhookModalOpen] = useState(false);
   const [webhookUrl, setWebhookUrl] = useState("");
   const [webhookEvents, setWebhookEvents] = useState<string[]>(["task.created"]);
   const [webhookError, setWebhookError] = useState<string | null>(null);
 
-  function handleGenerateKey(e: FormEvent) {
+  async function handleGenerateKey(e: FormEvent) {
     e.preventDefault();
-    const raw = generateApiKey(keyName);
+    setKeyError(null);
+    const raw = await generateApiKey(keyName);
+    if (!raw) {
+      setKeyError("Unable to generate API key. Please try again.");
+      return;
+    }
     setRevealedKey(raw);
   }
 
@@ -40,11 +49,12 @@ export default function IntegrationsSettingsPage() {
     setKeyModalOpen(false);
     setKeyName("");
     setRevealedKey(null);
+    setKeyError(null);
   }
 
-  function handleAddWebhook(e: FormEvent) {
+  async function handleAddWebhook(e: FormEvent) {
     e.preventDefault();
-    const result = addWebhook(webhookUrl, webhookEvents);
+    const result = await addWebhook(webhookUrl, webhookEvents);
     if (!result.ok) {
       setWebhookError(result.error ?? "Unable to add webhook.");
       return;
@@ -54,6 +64,26 @@ export default function IntegrationsSettingsPage() {
     setWebhookUrl("");
     setWebhookEvents(["task.created"]);
     setWebhookError(null);
+  }
+
+  if (dataError) {
+    return (
+      <SettingsShell title="Integrations" description="Connect FlowDesk with the tools your team already uses.">
+        <ErrorState testId="integrations-error-state" onRetry={() => initData()} />
+      </SettingsShell>
+    );
+  }
+
+  if (!dataLoaded) {
+    return (
+      <SettingsShell title="Integrations" description="Connect FlowDesk with the tools your team already uses.">
+        <div data-testid="integrations-loading" className="space-y-4">
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-32 w-full" />
+        </div>
+      </SettingsShell>
+    );
   }
 
   return (
@@ -70,8 +100,8 @@ export default function IntegrationsSettingsPage() {
             variant={integrations.slack ? "outline" : "primary"}
             size="sm"
             onClick={() => {
-              toggleIntegration("slack", !integrations.slack);
-              showToast(integrations.slack ? "Slack disconnected." : "Slack connected.");
+              const wasConnected = integrations.slack;
+              void toggleIntegration("slack", !wasConnected).then(() => showToast(wasConnected ? "Slack disconnected." : "Slack connected."));
             }}
           >
             {integrations.slack ? "Disconnect" : "Connect"}
@@ -88,8 +118,8 @@ export default function IntegrationsSettingsPage() {
             variant={integrations.googleCalendar ? "outline" : "primary"}
             size="sm"
             onClick={() => {
-              toggleIntegration("googleCalendar", !integrations.googleCalendar);
-              showToast(integrations.googleCalendar ? "Google Calendar disconnected." : "Google Calendar connected.");
+              const wasConnected = integrations.googleCalendar;
+              void toggleIntegration("googleCalendar", !wasConnected).then(() => showToast(wasConnected ? "Google Calendar disconnected." : "Google Calendar connected."));
             }}
           >
             {integrations.googleCalendar ? "Disconnect" : "Connect"}
@@ -115,8 +145,7 @@ export default function IntegrationsSettingsPage() {
               <button
                 data-testid={`revoke-api-key-${k.id}`}
                 onClick={() => {
-                  revokeApiKey(k.id);
-                  showToast("API key revoked.");
+                  void revokeApiKey(k.id).then(() => showToast("API key revoked."));
                 }}
                 className="text-sm font-medium text-red-600 hover:text-red-500"
               >
@@ -144,8 +173,7 @@ export default function IntegrationsSettingsPage() {
               <button
                 data-testid={`remove-webhook-${w.id}`}
                 onClick={() => {
-                  removeWebhook(w.id);
-                  showToast("Webhook removed.");
+                  void removeWebhook(w.id).then(() => showToast("Webhook removed."));
                 }}
                 className="text-sm font-medium text-red-600 hover:text-red-500"
               >
@@ -173,6 +201,11 @@ export default function IntegrationsSettingsPage() {
         ) : (
           <form data-testid="generate-api-key-form" onSubmit={handleGenerateKey} noValidate className="space-y-4">
             <Input id="api-key-name" data-testid="api-key-name-input" data-ai-target="api-key-name-input" label="Key name" value={keyName} onChange={(e) => setKeyName(e.target.value)} required />
+            {keyError && (
+              <p role="alert" data-testid="api-key-form-error" className="text-sm font-medium text-red-600">
+                {keyError}
+              </p>
+            )}
             <div className="flex justify-end gap-3 pt-2">
               <Button type="button" variant="outline" onClick={closeKeyModal}>
                 Cancel

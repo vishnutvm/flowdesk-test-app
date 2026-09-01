@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useFlowDeskStore } from "@/lib/store";
 import { canManageBilling } from "@/lib/permissions";
 import { SettingsShell } from "@/components/dashboard/SettingsShell";
-import { Card, Badge, PermissionDenied } from "@/components/ui/Misc";
+import { Card, Badge, PermissionDenied, Skeleton, ErrorState } from "@/components/ui/Misc";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
@@ -21,6 +21,9 @@ export default function BillingSettingsPage() {
   const invoices = useFlowDeskStore((s) => s.invoices);
   const changePlan = useFlowDeskStore((s) => s.changePlan);
   const simulatedRole = useFlowDeskStore((s) => s.simulatedRole);
+  const dataLoaded = useFlowDeskStore((s) => s.dataLoaded);
+  const dataError = useFlowDeskStore((s) => s.dataError);
+  const initData = useFlowDeskStore((s) => s.initData);
   const { showToast } = useToast();
   const canManage = canManageBilling(simulatedRole);
 
@@ -34,11 +37,31 @@ export default function BillingSettingsPage() {
     setModalOpen(true);
   }
 
-  function confirmChange() {
+  async function confirmChange() {
     const isUpgrade = PLANS.findIndex((p) => p.name === selectedPlan) > PLANS.findIndex((p) => p.name === organization.plan);
-    changePlan(selectedPlan);
+    await changePlan(selectedPlan);
     showToast(`Plan ${isUpgrade ? "upgraded" : "changed"} to ${selectedPlan}.`);
     setModalOpen(false);
+  }
+
+  if (dataError) {
+    return (
+      <SettingsShell title="Billing" description="Manage your subscription plan, payment method, and invoices.">
+        <ErrorState testId="billing-error-state" onRetry={() => initData()} />
+      </SettingsShell>
+    );
+  }
+
+  if (!dataLoaded) {
+    return (
+      <SettingsShell title="Billing" description="Manage your subscription plan, payment method, and invoices.">
+        <div data-testid="billing-loading" className="space-y-4">
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-40 w-full" />
+        </div>
+      </SettingsShell>
+    );
   }
 
   return (

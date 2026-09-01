@@ -14,9 +14,20 @@ questions and visually guide users through workflows.
 
 Because of that purpose:
 
-- There is **no real backend, database, or auth provider**. Everything is
-  mocked: seeded, deterministic data in `lib/seed-data.ts`, mutated via a
-  client-side store (`lib/store.ts`, Zustand) persisted to `localStorage`.
+- **Auth has no real provider and is intentionally kept that way.** Login,
+  signup, session, and the demo/simulated-role switcher are fully mocked
+  client-side (`lib/store.ts`, Zustand), persisted to `localStorage` under the
+  `flowdesk-storage` key. There is no password hashing, no real JWT/session,
+  and no account database.
+- **Business data (projects, tasks, team members, customers, notifications,
+  invoices, API keys, webhooks, login history, active sessions, integrations,
+  notification prefs) is backed by a real MongoDB Atlas database.** Next.js
+  Route Handlers under `app/api/**` provide CRUD over Mongoose models
+  (`lib/db/models.ts`); the Zustand store fetches from those routes and
+  refetches after each mutation, so the UI always reflects what's in MongoDB.
+  See `lib/mongodb.ts` for the connection helper and `scripts/seed-db.ts` for
+  the deterministic seed data (same records as before, now persisted instead
+  of held in memory).
 - Every important interactive element carries stable `data-testid` and
   `data-ai-target` attributes for automated testing and AI-guided navigation.
 - The help center / docs content is written to match the live UI exactly, so
@@ -30,8 +41,30 @@ for deployment steps.
 
 - Next.js (App Router) + TypeScript
 - Tailwind CSS
-- Zustand (client-side mock data/session store, persisted to `localStorage`)
+- MongoDB Atlas + Mongoose (business data — see `lib/db/models.ts`)
+- Zustand (client-side session store — mocked auth only — plus a thin data
+  cache populated from `app/api/**`, persisted to `localStorage`)
 - Vitest (unit tests) + Playwright (E2E tests)
+
+## Database setup
+
+1. Copy `.env.example` to `.env.local` and set `MONGODB_URI` to a MongoDB
+   Atlas (or any MongoDB) connection string. Use a dedicated database name in
+   the URI path, e.g. `.../flowdesk?retryWrites=true&w=majority`.
+2. Seed the deterministic demo data:
+   ```bash
+   npm run db:seed
+   ```
+   This is idempotent — it upserts each seed record by its fixed `id`, so
+   running it again converges the database back to the same known state
+   without duplicating records. Run it once after pointing at a fresh
+   database, and again any time you want to restore the original demo data
+   for records that still exist by their seed `id` (it does not delete
+   records created afterward through the UI, e.g. via "New project").
+3. `npm run dev` / `npm run build && npm run start` as usual — API routes
+   under `app/api/**` connect to MongoDB lazily at request time via
+   `lib/mongodb.ts`, so the app (and `npm run build`) works even before you've
+   set `MONGODB_URI`, as long as you don't hit a data-backed page.
 
 ## Local setup
 
@@ -94,21 +127,32 @@ npm run lint        # ESLint
 npm run typecheck   # tsc --noEmit
 npm run test         # unit tests (Vitest)
 npm run test:e2e     # end-to-end tests (Playwright; manages its own server)
+npm run db:seed      # idempotently (re)seed MongoDB with the deterministic demo data
 ```
 
 ## Environment variables
 
-See `.env.example`. Everything is optional — the app has no real backend.
-The only variable of note is `NEXT_PUBLIC_CHATBOT_WIDGET_URL`, the future
-embed URL for the real chatbot widget (see
-`components/ChatbotPlaceholder.tsx` for swap-in instructions).
+See `.env.example`. `MONGODB_URI` is required for any page/route that reads
+or writes business data (projects, tasks, etc.) — see "Database setup"
+above. `NEXT_PUBLIC_CHATBOT_WIDGET_URL` is the future embed URL for the real
+chatbot widget (see `components/ChatbotPlaceholder.tsx` for swap-in
+instructions) and remains optional.
 
 ## Known limitations
 
-- All data resets if you clear browser storage (`localStorage` key
-  `flowdesk-storage`) — this is by design, not a bug.
+- Auth (login, signup, session, simulated role) is fully mocked and resets
+  if you clear browser storage (`localStorage` key `flowdesk-storage`) — this
+  is by design, not a bug. Business data does **not** reset with it; it lives
+  in MongoDB and survives across browsers/devices/sessions.
 - "Sent" emails (password reset, invites) are mocked and never actually sent.
 - The payment method on the Billing page is display-only; no real card can
   be entered and no real charge ever occurs.
 - Role permissions are testable via a "Simulate role" selector on the Team
   page rather than requiring multiple real accounts.
+- Mutating actions in the Zustand store (`lib/store.ts`) refetch the affected
+  resource from the API after each write rather than updating optimistically
+  — simpler and correct by construction, at the cost of an extra round trip
+  per mutation. Fine at this app's scale.
+- `npm run db:seed` is additive/idempotent (upsert by id) — it restores the
+  original seed records but does not delete records created afterward
+  through the UI or by the Playwright suite.

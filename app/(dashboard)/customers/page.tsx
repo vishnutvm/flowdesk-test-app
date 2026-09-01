@@ -1,7 +1,7 @@
 "use client";
 import { useState, FormEvent } from "react";
 import { useFlowDeskStore } from "@/lib/store";
-import { Card, Badge, EmptyState } from "@/components/ui/Misc";
+import { Card, Badge, EmptyState, Skeleton, ErrorState } from "@/components/ui/Misc";
 import { Button } from "@/components/ui/Button";
 import { Input, Select } from "@/components/ui/Field";
 import { Modal } from "@/components/ui/Modal";
@@ -14,6 +14,9 @@ export default function CustomersPage() {
   const customers = useFlowDeskStore((s) => s.customers);
   const createCustomer = useFlowDeskStore((s) => s.createCustomer);
   const deleteCustomer = useFlowDeskStore((s) => s.deleteCustomer);
+  const dataLoaded = useFlowDeskStore((s) => s.dataLoaded);
+  const dataError = useFlowDeskStore((s) => s.dataError);
+  const initData = useFlowDeskStore((s) => s.initData);
   const { showToast } = useToast();
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -22,10 +25,13 @@ export default function CustomersPage() {
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<CustomerStatus>("Lead");
   const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  function handleCreate(e: FormEvent) {
+  async function handleCreate(e: FormEvent) {
     e.preventDefault();
-    const result = createCustomer({ name, company, email, status });
+    setSubmitting(true);
+    const result = await createCustomer({ name, company, email, status });
+    setSubmitting(false);
     if (!result.ok) {
       setError(result.error ?? "Unable to add customer.");
       return;
@@ -46,12 +52,20 @@ export default function CustomersPage() {
           <h1 className="text-2xl font-semibold text-slate-900">Customers</h1>
           <p className="mt-1 text-sm text-slate-500">Track the people and companies you work with.</p>
         </div>
-        <Button data-testid="new-customer-button" data-ai-target="new-customer-button" onClick={() => setModalOpen(true)}>
+        <Button data-testid="new-customer-button" data-ai-target="new-customer-button" disabled={!dataLoaded} onClick={() => setModalOpen(true)}>
           + New customer
         </Button>
       </div>
 
-      {customers.length === 0 ? (
+      {dataError ? (
+        <ErrorState testId="customers-error-state" onRetry={() => initData()} />
+      ) : !dataLoaded ? (
+        <div data-testid="customers-loading" className="space-y-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-12 w-full" />
+          ))}
+        </div>
+      ) : customers.length === 0 ? (
         <EmptyState
           testId="customers-empty-state"
           title="No customers yet"
@@ -87,8 +101,7 @@ export default function CustomersPage() {
                     <button
                       data-testid={`remove-customer-${c.id}`}
                       onClick={() => {
-                        deleteCustomer(c.id);
-                        showToast("Customer removed.");
+                        void deleteCustomer(c.id).then(() => showToast("Customer removed."));
                       }}
                       className="text-sm font-medium text-red-600 hover:text-red-500"
                     >
@@ -121,7 +134,7 @@ export default function CustomersPage() {
             <Button type="button" variant="outline" onClick={() => setModalOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit" data-testid="create-customer-submit" data-ai-target="create-customer-submit">
+            <Button type="submit" data-testid="create-customer-submit" data-ai-target="create-customer-submit" isLoading={submitting}>
               Add customer
             </Button>
           </div>

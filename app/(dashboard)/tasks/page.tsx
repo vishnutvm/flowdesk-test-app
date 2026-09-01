@@ -3,7 +3,7 @@ import { useMemo, useState, FormEvent, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useFlowDeskStore } from "@/lib/store";
-import { Card, Badge, EmptyState } from "@/components/ui/Misc";
+import { Card, Badge, EmptyState, Skeleton, ErrorState } from "@/components/ui/Misc";
 import { Button } from "@/components/ui/Button";
 import { Input, Select, Textarea } from "@/components/ui/Field";
 import { Modal } from "@/components/ui/Modal";
@@ -20,7 +20,11 @@ function TasksContent() {
   const teamMembers = useFlowDeskStore((s) => s.teamMembers);
   const createTask = useFlowDeskStore((s) => s.createTask);
   const updateTask = useFlowDeskStore((s) => s.updateTask);
+  const dataLoaded = useFlowDeskStore((s) => s.dataLoaded);
+  const dataError = useFlowDeskStore((s) => s.dataError);
+  const initData = useFlowDeskStore((s) => s.initData);
   const { showToast } = useToast();
+  const [submitting, setSubmitting] = useState(false);
 
   const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
@@ -35,6 +39,13 @@ function TasksContent() {
   const [assigneeId, setAssigneeId] = useState<string>("");
   const [dueDate, setDueDate] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  // Projects load asynchronously now, so the "New task" form can't resolve
+  // its default project selection at mount time the way it could when data
+  // was seeded synchronously (projects[] was empty on first render). Fall
+  // back to the first loaded project at render/submit time instead of
+  // trying to pre-fill `projectId` state once, which would go stale.
+  const effectiveProjectId = projectId || projects[0]?.id || "";
 
   const filtered = useMemo(() => {
     return tasks.filter((t) => {
@@ -55,10 +66,11 @@ function TasksContent() {
     setError(null);
   }
 
-  function handleCreate(e: FormEvent) {
+  async function handleCreate(e: FormEvent) {
     e.preventDefault();
-    const result = createTask({
-      projectId,
+    setSubmitting(true);
+    const result = await createTask({
+      projectId: effectiveProjectId,
       title,
       description,
       status,
@@ -66,6 +78,7 @@ function TasksContent() {
       assigneeId: assigneeId || null,
       dueDate,
     });
+    setSubmitting(false);
     if (!result.ok) {
       setError(result.error ?? "Unable to create task.");
       return;
@@ -86,7 +99,7 @@ function TasksContent() {
           <h1 className="text-2xl font-semibold text-slate-900">Tasks</h1>
           <p className="mt-1 text-sm text-slate-500">All tasks across your projects.</p>
         </div>
-        <Button data-testid="new-task-button" data-ai-target="new-task-button" onClick={() => setModalOpen(true)}>
+        <Button data-testid="new-task-button" data-ai-target="new-task-button" disabled={!dataLoaded} onClick={() => setModalOpen(true)}>
           + New task
         </Button>
       </div>
@@ -112,7 +125,15 @@ function TasksContent() {
         </select>
       </div>
 
-      {filtered.length === 0 ? (
+      {dataError ? (
+        <ErrorState testId="tasks-error-state" onRetry={() => initData()} />
+      ) : !dataLoaded ? (
+        <div data-testid="tasks-loading" className="space-y-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-12 w-full" />
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
         <EmptyState
           testId="tasks-empty-state"
           title="No tasks match these filters"
@@ -154,8 +175,7 @@ function TasksContent() {
                         data-ai-target="task-status-select"
                         value={t.status}
                         onChange={(e) => {
-                          updateTask(t.id, { status: e.target.value as TaskStatus });
-                          showToast("Task status updated.");
+                          void updateTask(t.id, { status: e.target.value as TaskStatus }).then(() => showToast("Task status updated."));
                         }}
                         className="rounded-md border border-slate-300 px-2 py-1 text-xs"
                       >
@@ -179,7 +199,7 @@ function TasksContent() {
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Create new task" testId="new-task-modal">
         <form data-testid="new-task-form" onSubmit={handleCreate} noValidate className="space-y-4">
-          <Select id="task-project" data-testid="task-project-input" data-ai-target="task-project-input" label="Project" value={projectId} onChange={(e) => setProjectId(e.target.value)} required>
+          <Select id="task-project" data-testid="task-project-input" data-ai-target="task-project-input" label="Project" value={effectiveProjectId} onChange={(e) => setProjectId(e.target.value)} required>
             {projects.map((p) => (
               <option key={p.id} value={p.id}>{p.name}</option>
             ))}
@@ -214,7 +234,7 @@ function TasksContent() {
             <Button type="button" variant="outline" onClick={() => setModalOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit" data-testid="create-task-submit" data-ai-target="create-task-submit">
+            <Button type="submit" data-testid="create-task-submit" data-ai-target="create-task-submit" isLoading={submitting}>
               Create task
             </Button>
           </div>

@@ -2,7 +2,7 @@
 import { useState, FormEvent } from "react";
 import { useFlowDeskStore } from "@/lib/store";
 import { SettingsShell } from "@/components/dashboard/SettingsShell";
-import { Card } from "@/components/ui/Misc";
+import { Card, Skeleton, ErrorState } from "@/components/ui/Misc";
 import { Input } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
@@ -12,6 +12,9 @@ export default function SecuritySettingsPage() {
   const loginHistory = useFlowDeskStore((s) => s.loginHistory);
   const activeSessions = useFlowDeskStore((s) => s.activeSessions);
   const revokeSession = useFlowDeskStore((s) => s.revokeSession);
+  const dataLoaded = useFlowDeskStore((s) => s.dataLoaded);
+  const dataError = useFlowDeskStore((s) => s.dataError);
+  const initData = useFlowDeskStore((s) => s.initData);
   const { showToast } = useToast();
 
   const [twoFA, setTwoFA] = useState(false);
@@ -41,6 +44,26 @@ export default function SecuritySettingsPage() {
       setNewPassword("");
       setConfirmPassword("");
     }, 350);
+  }
+
+  if (dataError) {
+    return (
+      <SettingsShell title="Security" description="Manage your password, two-factor authentication, and active sessions.">
+        <ErrorState testId="security-error-state" onRetry={() => initData()} />
+      </SettingsShell>
+    );
+  }
+
+  if (!dataLoaded) {
+    return (
+      <SettingsShell title="Security" description="Manage your password, two-factor authentication, and active sessions.">
+        <div data-testid="security-loading" className="space-y-4">
+          <Skeleton className="h-48 w-full" />
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-32 w-full" />
+        </div>
+      </SettingsShell>
+    );
   }
 
   return (
@@ -132,8 +155,7 @@ export default function SecuritySettingsPage() {
                 <button
                   data-testid={`revoke-session-${s.id}`}
                   onClick={() => {
-                    revokeSession(s.id);
-                    showToast("Session revoked.");
+                    void revokeSession(s.id).then(() => showToast("Session revoked."));
                   }}
                   className="text-sm font-medium text-red-600 hover:text-red-500"
                 >

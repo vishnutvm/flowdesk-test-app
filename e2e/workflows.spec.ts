@@ -6,14 +6,20 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("creates a new project", async ({ page }) => {
+  // Unique per run: the suite runs against a real, shared MongoDB database
+  // (see playwright.config.ts + e2e/global-setup.ts) that is only reseeded
+  // back to the fixed lib/seed-data.ts records between runs, not wiped —
+  // records created by previous runs of this test are not deleted. A fixed
+  // name would eventually collide with leftovers from earlier runs.
+  const projectName = `Playwright Test Project ${Date.now()}`;
   await page.goto("/projects");
   await page.getByTestId("new-project-button").click();
-  await page.getByTestId("project-name-input").fill("Playwright Test Project");
+  await page.getByTestId("project-name-input").fill(projectName);
   await page.getByTestId("project-description-input").fill("Created by an E2E test.");
   await page.getByTestId("project-due-date-input").fill("2026-12-31");
   await page.getByTestId("create-project-submit").click();
   await expect(page.getByTestId("toast")).toContainText(/project created/i);
-  await expect(page.getByText("Playwright Test Project")).toBeVisible();
+  await expect(page.getByText(projectName)).toBeVisible();
 });
 
 test("shows a validation error for a too-short project name", async ({ page }) => {
@@ -26,13 +32,14 @@ test("shows a validation error for a too-short project name", async ({ page }) =
 });
 
 test("creates a new task", async ({ page }) => {
+  const taskTitle = `Playwright Test Task ${Date.now()}`;
   await page.goto("/tasks");
   await page.getByTestId("new-task-button").click();
-  await page.getByTestId("task-title-input").fill("Playwright Test Task");
+  await page.getByTestId("task-title-input").fill(taskTitle);
   await page.getByTestId("task-due-date-input").fill("2026-12-31");
   await page.getByTestId("create-task-submit").click();
   await expect(page.getByTestId("toast")).toContainText(/task created/i);
-  await expect(page.getByText("Playwright Test Task")).toBeVisible();
+  await expect(page.getByText(taskTitle)).toBeVisible();
 });
 
 test("invites a new team member", async ({ page }) => {
