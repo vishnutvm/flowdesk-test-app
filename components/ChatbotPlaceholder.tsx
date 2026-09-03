@@ -20,15 +20,19 @@ import Script from "next/script";
  * live Genie test assistant as defaults so this works out of the box for
  * this test app's own integration testing.
  */
+// `||` (not `??`) deliberately — an env var explicitly set to an empty
+// string (e.g. left blank in Vercel's dashboard when only .env.example's
+// key was detected, before a real value existed) must also fall through
+// to these defaults, not just a strictly-undefined var.
 const WIDGET_SCRIPT_URL =
-  process.env.NEXT_PUBLIC_CHATBOT_WIDGET_URL ??
+  process.env.NEXT_PUBLIC_CHATBOT_WIDGET_URL ||
   "https://genie-dev-widget-473488813879.s3.ap-south-1.amazonaws.com/widget.js";
 const WIDGET_API_KEY =
-  process.env.NEXT_PUBLIC_CHATBOT_API_KEY ?? "pk_live_1ZD5HgAQRvZaWCWxRLi5zLjo4OPGj9jfnF-goxV4ZmI";
+  process.env.NEXT_PUBLIC_CHATBOT_API_KEY || "pk_live_1ZD5HgAQRvZaWCWxRLi5zLjo4OPGj9jfnF-goxV4ZmI";
 const WIDGET_ASSISTANT_ID =
-  process.env.NEXT_PUBLIC_CHATBOT_ASSISTANT_ID ?? "9e72a322-cebc-43ec-ba1b-56dad7af39c3";
+  process.env.NEXT_PUBLIC_CHATBOT_ASSISTANT_ID || "9e72a322-cebc-43ec-ba1b-56dad7af39c3";
 const WIDGET_API_BASE_URL =
-  process.env.NEXT_PUBLIC_CHATBOT_API_BASE_URL ?? "https://www.chatbotmaker.in";
+  process.env.NEXT_PUBLIC_CHATBOT_API_BASE_URL || "https://www.chatbotmaker.in";
 
 export function ChatbotPlaceholder() {
   if (!WIDGET_SCRIPT_URL || !WIDGET_API_KEY || !WIDGET_ASSISTANT_ID) {
