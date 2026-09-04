@@ -28,9 +28,9 @@ const WIDGET_SCRIPT_URL =
   process.env.NEXT_PUBLIC_CHATBOT_WIDGET_URL ||
   "https://genie-dev-widget-473488813879.s3.ap-south-1.amazonaws.com/widget.js";
 const WIDGET_API_KEY =
-  process.env.NEXT_PUBLIC_CHATBOT_API_KEY || "pk_live_1ZD5HgAQRvZaWCWxRLi5zLjo4OPGj9jfnF-goxV4ZmI";
+  process.env.NEXT_PUBLIC_CHATBOT_API_KEY || "pk_live_4S3KPoW9q5OBcdU3fQs_EP13tNkWVUlGAclpbcdyUZo";
 const WIDGET_ASSISTANT_ID =
-  process.env.NEXT_PUBLIC_CHATBOT_ASSISTANT_ID || "9e72a322-cebc-43ec-ba1b-56dad7af39c3";
+  process.env.NEXT_PUBLIC_CHATBOT_ASSISTANT_ID || "504c5196-98a4-4588-9562-9879ac6e1a6c";
 const WIDGET_API_BASE_URL =
   process.env.NEXT_PUBLIC_CHATBOT_API_BASE_URL || "https://www.chatbotmaker.in";
 
