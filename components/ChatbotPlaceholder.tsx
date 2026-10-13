@@ -26,11 +26,11 @@ import Script from "next/script";
 // to these defaults, not just a strictly-undefined var.
 const WIDGET_SCRIPT_URL =
   process.env.NEXT_PUBLIC_CHATBOT_WIDGET_URL ||
-  "https://genie-dev-widget-473488813879.s3.ap-south-1.amazonaws.com/widget.js";
+  "https://genie-dev-widget-401537511962.s3.ap-southeast-2.amazonaws.com/widget.js";
 const WIDGET_API_KEY =
-  process.env.NEXT_PUBLIC_CHATBOT_API_KEY || "pk_live_4S3KPoW9q5OBcdU3fQs_EP13tNkWVUlGAclpbcdyUZo";
+  process.env.NEXT_PUBLIC_CHATBOT_API_KEY || "pk_live_ltpiUfwQNIol03BdjfK1zYT7AI9n6WydrYXaziIWSoo";
 const WIDGET_ASSISTANT_ID =
-  process.env.NEXT_PUBLIC_CHATBOT_ASSISTANT_ID || "504c5196-98a4-4588-9562-9879ac6e1a6c";
+  process.env.NEXT_PUBLIC_CHATBOT_ASSISTANT_ID || "bb8e8d7d-24d2-4efd-9f75-edf3e84890bb";
 const WIDGET_API_BASE_URL =
   process.env.NEXT_PUBLIC_CHATBOT_API_BASE_URL || "https://www.chatbotmaker.in";
 
