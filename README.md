@@ -8,9 +8,8 @@ UI — but it is **not a real product**.
 
 This is **not** the chatbot platform itself. It exists solely as an
 **external integration / end-to-end testing target** for a separate chatbot
-platform built elsewhere. That platform will eventually embed a chat widget
-in this app (see `components/ChatbotPlaceholder.tsx`) to answer support
-questions and visually guide users through workflows.
+platform built elsewhere, which answers support questions about this app
+and visually guides users through workflows.
 
 Because of that purpose:
 
@@ -134,9 +133,7 @@ npm run db:seed      # idempotently (re)seed MongoDB with the deterministic demo
 
 See `.env.example`. `MONGODB_URI` is required for any page/route that reads
 or writes business data (projects, tasks, etc.) — see "Database setup"
-above. `NEXT_PUBLIC_CHATBOT_WIDGET_URL` is the future embed URL for the real
-chatbot widget (see `components/ChatbotPlaceholder.tsx` for swap-in
-instructions) and remains optional.
+above.
 
 ## Known limitations
 

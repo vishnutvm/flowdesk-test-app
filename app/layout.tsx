@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/Toast";
-import { ChatbotPlaceholder } from "@/components/ChatbotPlaceholder";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -29,7 +28,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col bg-slate-50 text-slate-900">
         <ToastProvider>
           {children}
-          <ChatbotPlaceholder />
         </ToastProvider>
       </body>
     </html>

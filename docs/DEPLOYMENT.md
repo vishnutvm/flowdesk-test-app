@@ -41,7 +41,6 @@ Copy `.env.example` for the full list.
 | Variable | Required | Purpose |
 |---|---|---|
 | `MONGODB_URI` | **Yes** | MongoDB Atlas connection string, including the database name (e.g. `/flowdesk`). Required for every page/route that reads or writes business data. Must be set as a **Vercel environment variable** (Project Settings → Environment Variables) for Production (and Preview/Development as needed) — see below. |
-| `NEXT_PUBLIC_CHATBOT_WIDGET_URL` | No | URL of the real chatbot widget's embed script. Leave unset until the chatbot platform is ready to be wired in — see `components/ChatbotPlaceholder.tsx` for the swap-in instructions. |
 
 Set variables in Vercel under **Project Settings → Environment Variables**
 for each environment (Production / Preview / Development) as needed.

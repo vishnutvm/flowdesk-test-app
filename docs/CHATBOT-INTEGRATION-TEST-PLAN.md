@@ -102,7 +102,7 @@ Every important interactive element carries a stable `data-testid`. Static
 2fa-toggle, active-sessions-list, activity-item, add-webhook-button, add-webhook-form,
 api-key-name-input, api-keys-list, auth-loading, back-to-docs, back-to-login,
 back-to-projects, back-to-tasks, change-password-error, change-password-form,
-change-plan-button, chatbot-placeholder, close-revealed-key, confirm-add-webhook,
+change-plan-button, close-revealed-key, confirm-add-webhook,
 confirm-delete-project, confirm-delete-task, confirm-generate-api-key,
 confirm-password-input, confirm-plan-change, continue-plan-change, continue-to-reset,
 create-customer-submit, create-project-submit, create-task-submit,
@@ -178,7 +178,7 @@ Static identifiers:
 
 ```
 2fa-toggle, add-webhook-button, api-key-name-input, change-plan-button,
-chatbot-placeholder, confirm-add-webhook, confirm-generate-api-key,
+confirm-add-webhook, confirm-generate-api-key,
 confirm-password, create-customer-submit, create-project-submit,
 create-task-submit, current-password, customer-company-input,
 customer-email-input, customer-name-input, customer-status-input,
@@ -302,44 +302,3 @@ highlight/point to (by `data-ai-target`).
 - **Answer**: Owner has full control; Admin manages team/projects/integrations; Member can create/edit projects, tasks and customers; Viewer is read-only. Change a role from the dropdown next to a member's name on Team or Settings > Team.
 - **Navigation path**: `sidebar-team` → `/team` (or `settings-team` → `/settings/team`)
 - **Visual guidance**: `member-role-select`
-
----
-
-## K. Widget integration instructions
-
-The real chatbot widget is not implemented yet. `components/ChatbotPlaceholder.tsx`
-is a clearly-marked, inert placeholder rendered from `app/layout.tsx`, and
-`NEXT_PUBLIC_CHATBOT_WIDGET_URL` in `.env.example` is the designated env var
-for the real widget's embed script URL.
-
-To swap in the real widget:
-
-1. Set `NEXT_PUBLIC_CHATBOT_WIDGET_URL` (in `.env.local` for dev, or in
-   Vercel project env vars for deployed environments) to the widget's script
-   URL, e.g. `https://cdn.example-chatbot.com/widget.js`.
-2. In `components/ChatbotPlaceholder.tsx`, replace the placeholder `<div>`
-   bubble with a `next/script` tag reading from that env var:
-
-   ```tsx
-   import Script from "next/script";
-
-   export function ChatbotPlaceholder() {
-     const widgetUrl = process.env.NEXT_PUBLIC_CHATBOT_WIDGET_URL;
-     if (!widgetUrl) return null;
-     return <Script src={widgetUrl} strategy="lazyOnload" data-org="flowdesk-demo" />;
-   }
-   ```
-
-3. Remove the placeholder bubble markup and its `data-testid="chatbot-placeholder"`
-   once the real widget renders its own UI, or keep the wrapping component as
-   a stable mount point if the widget platform expects one.
-4. No other file needs to change — `ChatbotPlaceholder` is already imported
-   once, in `app/layout.tsx`, and rendered on every route (marketing, auth,
-   and dashboard).
-5. Point the chatbot's knowledge base at `lib/docs-content.ts` (or the
-   rendered `/docs/[slug]` pages) as its source of truth — the Q&A pairs in
-   section G above are extracted directly from that file, so the two will
-   never drift apart as long as both are updated together.
-6. Use the `data-testid` (section E) and `data-ai-target` (section F) lists
-   above for element selection; prefer `data-ai-target` for semantic,
-   human-readable guidance and `data-testid` for automated test assertions.
